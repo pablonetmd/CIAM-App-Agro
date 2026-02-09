@@ -1,0 +1,29 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Professional {
+  id        String   @id @default(uuid())
+  nombre    String
+  matricula String   @unique
+  estado    String
+  telefono  String?
+  recipes   Recipe[]
+}
+
+model Recipe {
+  id               String       @id @default(uuid())
+  profesionalId    String
+  cultivo          String
+  insumos          String
+  dosis            String
+  codigoActivacion String       @unique
+  pagado           Boolean      @default(false)
+  utilizada        Boolean      @default(false)
+  createdAt        DateTime     @default(now())
+  profesional      Professional @relation(fields: [profesionalId], references: [id])
+}
