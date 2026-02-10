@@ -1,11 +1,17 @@
 import { PrismaClient } from '@prisma/client'
 
 const prismaClientSingleton = () => {
-    // Si no hay URL, devolvemos un objeto vacío o null para no romper el build
+    // Prevent instantiation if DATABASE_URL is missing (e.g., during build phase)
     if (!process.env.DATABASE_URL) {
         return null as unknown as PrismaClient
     }
-    return new PrismaClient()
+
+    try {
+        return new PrismaClient()
+    } catch (error) {
+        console.error('Failed to initialize PrismaClient:', error)
+        return null as unknown as PrismaClient
+    }
 }
 
 const globalForPrisma = globalThis as unknown as {
@@ -14,4 +20,6 @@ const globalForPrisma = globalThis as unknown as {
 
 export const prisma = globalForPrisma.prisma ?? prismaClientSingleton()
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+if (process.env.NODE_ENV !== 'production' && prisma) {
+    globalForPrisma.prisma = prisma
+}
