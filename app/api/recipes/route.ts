@@ -16,9 +16,8 @@ function generateActivationCode(): string {
 }
 
 export async function POST(request: NextRequest) {
-    // Bypass para fase de build
-    if (process.env.NEXT_PHASE === 'phase-production-build') {
-        return NextResponse.json({ message: "Bypass build" });
+    if (!process.env.DATABASE_URL) {
+        return NextResponse.json([], { status: 200 });
     }
 
     try {
@@ -62,9 +61,8 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-    // Bypass para fase de build
-    if (process.env.NEXT_PHASE === 'phase-production-build') {
-        return NextResponse.json({ message: "Bypass build" });
+    if (!process.env.DATABASE_URL) {
+        return NextResponse.json([], { status: 200 });
     }
 
     try {
