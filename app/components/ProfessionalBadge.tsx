@@ -1,12 +1,16 @@
 interface ProfessionalBadgeProps {
-    status: 'HABILITADO' | 'RECOMENDADOR' | 'INACTIVO'
+    status: string
     showIcon?: boolean
 }
 
 export default function ProfessionalBadge({ status, showIcon = true }: ProfessionalBadgeProps) {
     const getStatusConfig = () => {
-        switch (status) {
+        // Normalizar estado
+        const normalizedStatus = status?.toUpperCase();
+
+        switch (normalizedStatus) {
             case 'HABILITADO':
+            case 'ACTIVO':
                 return {
                     className: 'badge-habilitado',
                     label: 'Habilitado',
@@ -18,10 +22,17 @@ export default function ProfessionalBadge({ status, showIcon = true }: Professio
                     label: 'Recomendador',
                     icon: 'ℹ',
                 }
+            case 'PENDIENTE':
+                return {
+                    className: 'badge-pendiente',
+                    label: 'Pendiente',
+                    icon: '○',
+                }
             case 'INACTIVO':
+            default:
                 return {
                     className: 'badge-inactivo',
-                    label: 'Inactivo',
+                    label: normalizedStatus || 'Inactivo',
                     icon: '✕',
                 }
         }

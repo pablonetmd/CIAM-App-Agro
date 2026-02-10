@@ -13,7 +13,7 @@ interface RecipeCardProps {
         profesional: {
             nombre: string
             matricula: string
-            estado: 'HABILITADO' | 'RECOMENDADOR' | 'INACTIVO'
+            estado: string
         }
     }
 }

@@ -8,7 +8,7 @@ interface Professional {
     id: string
     nombre: string
     matricula: string
-    estado: 'HABILITADO' | 'RECOMENDADOR' | 'INACTIVO'
+    estado: string
     telefono: string | null
 }
 
