@@ -5,18 +5,26 @@ export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 
-// Función auxiliar para generar el código
-function generateActivationCode(): string {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-    let code = ''
-    for (let i = 0; i < 8; i++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length))
+export async function GET(request: NextRequest) {
+    if (process.env.NEXT_PHASE === 'phase-production-build') {
+        return NextResponse.json({ bypass: true });
     }
-    return code
+
+    try {
+        if (!prisma) {
+            return NextResponse.json({ error: 'DB unavailable' }, { status: 503 });
+        }
+        const recipes = await prisma.recipe.findMany({
+            include: { profesional: true },
+            orderBy: { createdAt: 'desc' },
+        })
+        return NextResponse.json(recipes)
+    } catch (error) {
+        return NextResponse.json({ error: 'Error fetching recipes' }, { status: 500 })
+    }
 }
 
 export async function POST(request: NextRequest) {
-    // Bypass solo durante la fase de build
     if (process.env.NEXT_PHASE === 'phase-production-build') {
         return NextResponse.json({ bypass: true });
     }
@@ -25,8 +33,19 @@ export async function POST(request: NextRequest) {
         const body = await request.json()
         const { profesionalId, cultivo, insumos, dosis } = body
 
-        if (!profesionalId) {
-            return NextResponse.json({ error: 'ID de profesional requerido' }, { status: 400 })
+        if (!profesionalId || !cultivo || !insumos || !dosis) {
+            return NextResponse.json(
+                { error: 'Todos los campos son obligatorios' },
+                { status: 400 }
+            )
+        }
+
+        if (!prisma) {
+            console.error('[API ERROR] Prisma client is null');
+            return NextResponse.json(
+                { error: 'Base de datos no disponible temporalmente' },
+                { status: 503 }
+            )
         }
 
         // Verificar profesional
@@ -50,48 +69,28 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Generar código único
-        let codigoActivacion = generateActivationCode()
-        let isUnique = false
-        while (!isUnique) {
-            const existing = await prisma.recipe.findUnique({ where: { codigoActivacion } })
-            if (!existing) isUnique = true
-            else codigoActivacion = generateActivationCode()
-        }
+        // Generar código de activación único (vibrant code)
+        const codigoActivacion = Math.random().toString(36).substring(2, 8).toUpperCase()
 
         const recipe = await prisma.recipe.create({
-            data: { profesionalId, cultivo, insumos, dosis, codigoActivacion },
-            include: { profesional: true }
+            data: {
+                profesionalId,
+                cultivo,
+                insumos,
+                dosis,
+                codigoActivacion,
+            },
+            include: {
+                profesional: true,
+            },
         })
 
-        return NextResponse.json(recipe, { status: 201 })
+        return NextResponse.json(recipe)
     } catch (error: any) {
-        return NextResponse.json({ error: 'Error al crear receta', details: error.message }, { status: 500 })
-    }
-}
-
-export async function GET(request: NextRequest) {
-    // Bypass solo durante la fase de build
-    if (process.env.NEXT_PHASE === 'phase-production-build') {
-        return NextResponse.json({ bypass: true });
-    }
-
-    try {
-        const searchParams = request.nextUrl.searchParams
-        const profesionalId = searchParams.get('profesionalId')
-
-        if (!profesionalId) {
-            return NextResponse.json({ error: 'ID de profesional requerido' }, { status: 400 })
-        }
-
-        const recipes = await prisma.recipe.findMany({
-            where: { profesionalId },
-            include: { profesional: true },
-            orderBy: { createdAt: 'desc' }
-        })
-
-        return NextResponse.json(recipes)
-    } catch (error: any) {
-        return NextResponse.json({ error: 'Error al obtener recetas' }, { status: 500 })
+        console.error('Error creating recipe:', error)
+        return NextResponse.json(
+            { error: 'Error al crear receta', details: error.message },
+            { status: 500 }
+        )
     }
 }

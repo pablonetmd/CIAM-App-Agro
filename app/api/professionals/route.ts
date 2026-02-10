@@ -19,6 +19,14 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Matrícula requerida' }, { status: 400 })
         }
 
+        if (!prisma) {
+            console.error('[API ERROR] Prisma client is null');
+            return NextResponse.json(
+                { error: 'Base de datos no disponible temporalmente' },
+                { status: 503 }
+            )
+        }
+
         const professional = await prisma.professional.findUnique({
             where: { matricula },
         })

@@ -6,7 +6,6 @@ export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 
 export async function POST(request: NextRequest) {
-    // Bypass solo durante la fase de build
     if (process.env.NEXT_PHASE === 'phase-production-build') {
         return NextResponse.json({ bypass: true });
     }
@@ -19,6 +18,14 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(
                 { error: 'Código de activación requerido' },
                 { status: 400 }
+            )
+        }
+
+        if (!prisma) {
+            console.error('[API ERROR] Prisma client is null');
+            return NextResponse.json(
+                { error: 'Base de datos no disponible temporalmente' },
+                { status: 503 }
             )
         }
 
