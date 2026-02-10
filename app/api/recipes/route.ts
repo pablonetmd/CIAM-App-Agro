@@ -5,32 +5,45 @@ export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 
-
-// Generate unique activation code
-function generateActivationCode(): string {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-    let code = ''
-    for (let i = 0; i < 8; i++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length))
+export async function GET(request: NextRequest) {
+    // 1. SI ESTAMOS EN EL BUILD, SALTAMOS LA CONEXIÓN
+    if (process.env.NEXT_PHASE === 'phase-production-build') {
+        return NextResponse.json({ message: "Bypass build" });
     }
-    return code
-}
 
-export async function POST(request: NextRequest) {
     try {
-        const body = await request.json()
-        const { profesionalId, cultivo, insumos, dosis } = body
+        const searchParams = request.nextUrl.searchParams
+        const matricula = searchParams.get('matricula')
 
-        // Validate required fields
-        if (!profesionalId || !cultivo || !insumos || !dosis) {
-            return NextResponse.json(
-                { error: 'Todos los campos son requeridos' },
-                { status: 400 }
-            )
+        if (!matricula) {
+            return NextResponse.json({ error: 'Matrícula requerida' }, { status: 400 })
         }
 
-        // Verify professional exists and is HABILITADO
+        // Solo llega aquí cuando la web ya está online
         const professional = await prisma.professional.findUnique({
+            where: { matricula },
+        })
+
+        try {
+            const searchParams = request.nextUrl.searchParams
+            const matricula = searchParams.get('matricula')
+
+            // Generate unique activation code
+            function generateActivationCode(): string {
+                const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+                let code = ''
+                for (let i = 0; i < 8; i++) {
+                    code += chars.charAt(Math.floor(Math.random() * chars.length))
+                }
+                return code
+            }
+
+      
+                    )
+        }
+
+                // Verify professional exists and is HABILITADO
+                const professional = await prisma.professional.findUnique({
             where: { id: profesionalId },
         })
 
