@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 async function main() {
-    console.log('Seed ejecutado correctamente')
+    console.log('Base de datos lista')
 }
 
 main()
