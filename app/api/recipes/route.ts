@@ -34,9 +34,18 @@ export async function POST(request: NextRequest) {
             where: { id: profesionalId },
         })
 
-        if (!professional || professional.estado !== 'HABILITADO') {
+        if (!professional) {
             return NextResponse.json(
-                { error: 'Profesional no encontrado o no habilitado' },
+                { error: 'Profesional no encontrado' },
+                { status: 404 }
+            )
+        }
+
+        // Admitir tanto HABILITADO como ACTIVO
+        const isHabilitado = professional.estado === 'HABILITADO' || professional.estado === 'ACTIVO';
+        if (!isHabilitado) {
+            return NextResponse.json(
+                { error: 'Profesional no habilitado para generar recetas' },
                 { status: 403 }
             )
         }

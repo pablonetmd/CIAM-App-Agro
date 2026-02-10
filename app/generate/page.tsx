@@ -49,8 +49,8 @@ export default function GeneratePage() {
                 return
             }
 
-            if (data.estado !== 'HABILITADO') {
-                setError('Solo profesionales habilitados pueden generar recetas')
+            if (!data.isHabilitado) {
+                setError('Solo profesionales habilitados o activos pueden generar recetas')
                 return
             }
 

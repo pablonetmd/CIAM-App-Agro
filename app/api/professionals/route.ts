@@ -30,7 +30,13 @@ export async function GET(request: NextRequest) {
             )
         }
 
-        return NextResponse.json(professional)
+        // Admitir tanto HABILITADO (code) como ACTIVO (db manual)
+        const isHabilitado = professional.estado === 'HABILITADO' || professional.estado === 'ACTIVO';
+
+        return NextResponse.json({
+            ...professional,
+            isHabilitado // Flag auxiliar para el frontend
+        })
     } catch (error: any) {
         console.error('Error fetching professional:', error)
         return NextResponse.json(
