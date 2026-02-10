@@ -6,7 +6,7 @@ export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 
 export async function POST(request: NextRequest) {
-    if (!process.env.DATABASE_URL) {
+    if (process.env.NEXT_PHASE === 'phase-production-build' || !process.env.DATABASE_URL) {
         return NextResponse.json([], { status: 200 });
     }
 
