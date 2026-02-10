@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+
 // Generate unique activation code
 function generateActivationCode(): string {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
