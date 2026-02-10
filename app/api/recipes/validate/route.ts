@@ -6,8 +6,8 @@ export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 
 export async function POST(request: NextRequest) {
-    // Senior Architectural Bypass
-    if (!process.env.DATABASE_URL || process.env.NEXT_PHASE === 'phase-production-build') {
+    // Bypass solo durante la fase de build
+    if (process.env.NEXT_PHASE === 'phase-production-build') {
         return NextResponse.json({ bypass: true });
     }
 
