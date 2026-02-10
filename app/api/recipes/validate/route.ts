@@ -21,10 +21,10 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        if (!prisma) {
-            console.error('[API ERROR] Prisma client is null');
+        if (!prisma.$isReady) {
+            console.error('[API ERROR] Prisma client failed to initialize');
             return NextResponse.json(
-                { error: 'Base de datos no disponible temporalmente' },
+                { error: 'Base de datos no disponible temporalmente (Prisma Init Failed)' },
                 { status: 503 }
             )
         }

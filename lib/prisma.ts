@@ -3,53 +3,53 @@ import { PrismaNeon } from '@prisma/adapter-neon'
 import { PrismaClient } from '@prisma/client'
 import ws from 'ws'
 
-// Configuración para permitir WebSockets en ambientes serverless
 neonConfig.webSocketConstructor = ws
 
-const prismaClientSingleton = () => {
-    // Obtenemos la URL de forma segura
+const globalForPrisma = globalThis as unknown as {
+    prisma: PrismaClient | null
+}
+
+const createPrismaClient = (): PrismaClient | null => {
     const url = process.env.DATABASE_URL;
-
-    // Log de diagnóstico crítico para Vercel (no muestra la URL completa por seguridad)
-    const urlInfo = url ? `Exist (Length: ${url.length}, Protocol: ${url.split(':')[0]})` : 'MISSING';
-    console.log(`[PRISMA INIT] DATABASE_URL: ${urlInfo}`);
-
-    // Durante el build de Vercel, si no hay URL, evitamos instanciar
-    if (process.env.NEXT_PHASE === 'phase-production-build' && !url) {
-        return null as unknown as PrismaClient
-    }
-
-    // Si no hay URL en runtime, devolvemos null para que el API devuelva 503 y no un crash
-    if (!url || url.trim() === '') {
-        console.error('[PRISMA ERROR] DATABASE_URL is empty or missing at runtime');
-        return null as unknown as PrismaClient
-    }
+    if (!url || url.trim() === '' || url === 'undefined') return null;
 
     try {
         const pool = new Pool({ connectionString: url })
-
-        // Listener de errores para el pool
-        pool.on('error', (err: any) => {
-            console.error('[PRISMA POOL ERROR]', err.message);
-        });
-
         const adapter = new PrismaNeon(pool as any)
-        const client = new PrismaClient({ adapter })
-
-        return client
-    } catch (error: any) {
-        console.error('[PRISMA ERROR] Constructor failed:', error.message);
-        return null as unknown as PrismaClient
+        return new PrismaClient({ adapter })
+    } catch (e) {
+        return null;
     }
 }
 
-const globalForPrisma = globalThis as unknown as {
-    prisma: PrismaClient | undefined
-}
+// Proxy transparente que actúa como PrismaClient pero se inicializa bajo demanda
+export const prisma = new Proxy({} as PrismaClient & { $isReady: boolean }, {
+    get: (target, prop) => {
+        // Propiedad especial para chequear estado sin disparar errores
+        if (prop === '$isReady') {
+            if (globalForPrisma.prisma) return true;
+            const test = createPrismaClient();
+            if (test) {
+                globalForPrisma.prisma = test;
+                return true;
+            }
+            return false;
+        }
 
-// Inyectamos el singleton
-export const prisma = globalForPrisma.prisma ?? prismaClientSingleton()
+        if (globalForPrisma.prisma) {
+            const val = (globalForPrisma.prisma as any)[prop];
+            return typeof val === 'function' ? val.bind(globalForPrisma.prisma) : val;
+        }
 
-if (process.env.NODE_ENV !== 'production' && prisma) {
-    globalForPrisma.prisma = prisma
-}
+        const newClient = createPrismaClient();
+        if (!newClient) {
+            // Mock para build
+            if (process.env.NEXT_PHASE === 'phase-production-build') return (target as any)[prop];
+            throw new Error('DATABASE_INITIALIZATION_FAILED');
+        }
+
+        globalForPrisma.prisma = newClient;
+        const val = (newClient as any)[prop];
+        return typeof val === 'function' ? val.bind(newClient) : val;
+    }
+})
