@@ -45,7 +45,7 @@ export default function ValidatePage() {
             const data = await res.json()
 
             if (!res.ok) {
-                setResult({ valid: false, error: data.error })
+                setResult({ valid: false, error: `${data.error}${data.details ? ': ' + data.details : ''}` })
             } else {
                 setResult(data)
             }

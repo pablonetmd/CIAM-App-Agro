@@ -23,6 +23,8 @@ const prismaClientSingleton = () => {
 
     try {
         const pool = new Pool({ connectionString: url })
+        pool.on('error', (err) => console.error('[PRISMA POOL ERROR]', err));
+
         const adapter = new PrismaNeon(pool as any)
         return new PrismaClient({ adapter })
     } catch (error: any) {

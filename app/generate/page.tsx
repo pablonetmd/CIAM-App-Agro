@@ -45,7 +45,7 @@ export default function GeneratePage() {
             const data = await res.json()
 
             if (!res.ok) {
-                setError(data.error || 'Error al verificar profesional')
+                setError(`${data.error}${data.details ? ': ' + data.details : ''}`)
                 return
             }
 
