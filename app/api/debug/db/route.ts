@@ -1,46 +1,39 @@
 import { NextResponse } from 'next/server'
-import { Pool } from '@neondatabase/serverless'
+import { neon } from '@neondatabase/serverless'
 import { prisma, getInitError, getSanitizedUrlExport } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
     const diagnostic = {
-        label: "CIAM-DIAGNOSTIC-V11-MANUAL-PARAMS",
+        label: "CIAM-DIAGNOSTIC-V12-HTTP-ADAPTER",
         status: "TESTING",
         initError: getInitError(),
         environment: {
-            URL_MATCH: process.env.DATABASE_URL === getSanitizedUrlExport()
+            DATABASE_URL: !!process.env.DATABASE_URL
         },
-        directDriver: "PENDING",
+        httpDriver: "PENDING",
         prismaStatus: "PENDING"
     }
 
-    // Test Driver
+    // Test 1: Driver HTTP Directo
     try {
         const url = getSanitizedUrlExport();
         if (url) {
-            const dbUrl = new URL(url);
-            const pool = new Pool({
-                host: dbUrl.hostname,
-                user: dbUrl.username,
-                password: decodeURIComponent(dbUrl.password),
-                database: dbUrl.pathname.slice(1),
-                ssl: true
-            });
-            const client = await pool.connect();
-            await client.query('SELECT 1');
-            client.release();
-            diagnostic.directDriver = "OK";
+            const sql = neon(url);
+            const result = await sql`SELECT 1 as connection_test`;
+            diagnostic.httpDriver = "OK (" + result[0].connection_test + ")";
+        } else {
+            diagnostic.httpDriver = "SKIP: NO URL";
         }
     } catch (e: any) {
-        diagnostic.directDriver = "ERROR: " + e.message;
+        diagnostic.httpDriver = "ERROR: " + e.message;
     }
 
-    // Test Prisma
+    // Test 2: Prisma
     try {
         if (!prisma) {
-            diagnostic.prismaStatus = "OFFLINE";
+            diagnostic.prismaStatus = "OFFLINE/NULL";
         } else {
             const count = await (prisma as any).professional.count()
             diagnostic.prismaStatus = "ONLINE (" + count + ")";

@@ -1,9 +1,6 @@
-import { neonConfig, Pool } from '@neondatabase/serverless'
+import { neon } from '@neondatabase/serverless'
 import { PrismaNeon } from '@prisma/adapter-neon'
 import { PrismaClient } from '@prisma/client'
-import ws from 'ws'
-
-neonConfig.webSocketConstructor = ws
 
 const globalForPrisma = globalThis as unknown as {
     prisma: PrismaClient | undefined
@@ -16,8 +13,11 @@ const getSanitizedUrl = () => {
         process.env.DATABASE_PRISMA_URL;
 
     if (!url || url === 'undefined' || url.trim() === '') return null;
+
+    // Limpieza de seguridad
     if (url.includes("'")) url = url.split("'")[1] || url;
     if (url.startsWith("psql ")) url = url.replace("psql ", "");
+
     return url.trim();
 }
 
@@ -29,28 +29,19 @@ const createClient = () => {
     }
 
     try {
-        // Para que el motor interno de Prisma no se queje
+        // ACTUALIZACIÓN V12: Usamos el driver HTTP de Neon. 
+        // Es mucho más estable en Vercel que el Pool de WebSockets/Pg.
+        const sql = neon(url);
+
+        // El adaptador de Prisma acepta el cliente HTTP directamente.
+        const adapter = new PrismaNeon(sql as any);
+
+        // Sincronizamos la variable por si acaso el motor interno la busca
         process.env.DATABASE_URL = url;
 
-        // PARSEO MANUAL: Si el connectionString falla, pasamos los parámetros por separado.
-        // Esto es mucho más robusto.
-        const dbUrl = new URL(url);
-        const poolConfig = {
-            host: dbUrl.hostname,
-            user: dbUrl.username,
-            password: decodeURIComponent(dbUrl.password),
-            database: dbUrl.pathname.slice(1),
-            port: parseInt(dbUrl.port) || 5432,
-            ssl: true,
-            max: 1 // Muy importante en Serverless para no agotar conexiones
-        };
-
-        const pool = new Pool(poolConfig);
-        const adapter = new PrismaNeon(pool as any);
-
-        // En Prisma 7, pasamos el adaptador.
         return new PrismaClient({ adapter });
     } catch (e: any) {
+        console.error('[PRISMA FATAL]', e.message);
         globalForPrisma.prismaInitError = e.message;
         return null;
     }
