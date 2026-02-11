@@ -1,12 +1,6 @@
-import { Pool, neonConfig } from '@neondatabase/serverless'
-import { PrismaPg } from '@prisma/adapter-pg'
+import { neon } from '@neondatabase/serverless'
+import { PrismaNeon } from '@prisma/adapter-neon'
 import { PrismaClient } from '@prisma/client'
-import ws from 'ws'
-
-// Configuración obligatoria para WebSockets en Node.js
-if (typeof window === 'undefined') {
-    neonConfig.webSocketConstructor = ws
-}
 
 const globalForPrisma = globalThis as unknown as {
     prisma: PrismaClient | undefined
@@ -27,30 +21,28 @@ const getSanitizedUrl = () => {
     const cleanUrl = url.trim();
     globalForPrisma.maskedUrl = cleanUrl.substring(0, 10) + "..." + cleanUrl.substring(cleanUrl.length - 5);
 
+    // Inyectamos GLOBALMENTE para el motor de Prisma
+    process.env.DATABASE_URL = cleanUrl;
     return cleanUrl;
 }
 
 const createClient = () => {
     const url = getSanitizedUrl();
     if (!url) {
-        globalForPrisma.prismaInitError = "DATABASE_URL no encontrada.";
+        globalForPrisma.prismaInitError = "DATABASE_URL no encontrada en el sistema.";
         return null;
     }
 
     try {
-        // V23: El "Puente Estándar". 
-        // Usamos Pool de Neon pero con el adaptador de PG estándar.
-        // Esto suele ser mucho más estable que el adaptador HTTP específico.
-        const pool = new Pool({ connectionString: url });
-        const adapter = new PrismaPg(pool);
+        // V24: Neon Pulse (Official HTTP Adapter)
+        const sql = neon(url);
+        const adapter = new PrismaNeon(sql);
 
-        // Sincronizamos el entorno por si el motor interno lo requiere para el chequeo de Host.
-        process.env.DATABASE_URL = url;
-
+        // Constructor minimalista oficial de Prisma 7
         return new PrismaClient({ adapter });
     } catch (e: any) {
         globalForPrisma.prismaInitError = e.message;
-        console.error('[PRISMA FATAL V23]', e.message);
+        console.error('[PRISMA FATAL V24]', e.message);
         return null;
     }
 }

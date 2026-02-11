@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
     const diagnostic = {
-        label: "CIAM-DIAGNOSTIC-V23-DUAL-TEST",
+        label: "CIAM-DIAGNOSTIC-V24-NEON-PULSE",
         status: "TESTING",
         initError: getInitError(),
         urlInfo: getMaskedUrl(),
@@ -14,24 +14,23 @@ export async function GET() {
         prisma: "PENDING"
     }
 
-    const url = process.env.DATABASE_URL ||
-        process.env.POSTGRES_URL ||
-        process.env.DATABASE_PRISMA_URL;
+    const url = process.env.DATABASE_URL;
 
-    // --- TEST 1: Driver Directo (Neon HTTP) ---
+    // --- TEST 1: Driver Directo (Neon HTTP con sintaxis correcta) ---
     try {
         if (!url) {
             diagnostic.driverStatus = "FAIL: No URL";
         } else {
             const sql = neon(url);
-            await sql('SELECT 1');
+            // Sintaxis de tagged template obligatoria en versiones modernas de neon
+            await sql`SELECT 1`;
             diagnostic.driverStatus = "SUCCESS (Neon HTTP Connected)";
         }
     } catch (e: any) {
         diagnostic.driverStatus = "ERROR: " + e.message;
     }
 
-    // --- TEST 2: Prisma (Con adaptador PG) ---
+    // --- TEST 2: Prisma ---
     try {
         if (!prisma) {
             diagnostic.prisma = "CLIENT_NULL";
