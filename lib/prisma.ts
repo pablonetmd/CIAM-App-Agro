@@ -1,15 +1,11 @@
-import { neonConfig, Pool } from '@neondatabase/serverless'
+import { neon } from '@neondatabase/serverless'
 import { PrismaNeon } from '@prisma/adapter-neon'
 import { PrismaClient } from '@prisma/client'
-import ws from 'ws'
-
-if (typeof window === 'undefined') {
-    neonConfig.webSocketConstructor = ws
-}
 
 const globalForPrisma = globalThis as unknown as {
     prisma: PrismaClient | undefined
     prismaInitError: string | null
+    maskedUrl: string | null
 }
 
 const getSanitizedUrl = () => {
@@ -21,29 +17,39 @@ const getSanitizedUrl = () => {
     url = url.trim();
     if (url.includes("'")) url = url.split("'")[1] || url;
     if (url.startsWith("psql ")) url = url.replace("psql ", "");
-    return url;
+
+    const cleanUrl = url.trim();
+    // Guardamos una versión enmascarada para diagnóstico
+    globalForPrisma.maskedUrl = cleanUrl.substring(0, 10) + "..." + cleanUrl.substring(cleanUrl.length - 5);
+
+    return cleanUrl;
 }
 
 const createClient = () => {
     const url = getSanitizedUrl();
     if (!url) {
-        globalForPrisma.prismaInitError = "URL no encontrada.";
+        globalForPrisma.prismaInitError = "URL no encontrada en el sistema.";
         return null;
     }
 
     try {
-        // V21: Estándar Prisma 7.
-        // Proporcionamos el adaptador Y la datasourceUrl explícitamente.
-        const pool = new Pool({ connectionString: url });
-        const adapter = new PrismaNeon(pool as any);
+        // Forzamos la variable de entorno para que el motor interno de Prisma la vea
+        process.env.DATABASE_URL = url;
 
-        return new PrismaClient({
-            adapter,
-            // En Prisma 7, datasourceUrl es la forma correcta de pasar la URL al constructor
-            datasourceUrl: url
-        });
+        // V22: La configuración más limpia posible para Prisma 7 + Neon HTTP
+        const sql = neon(url);
+        const adapter = new PrismaNeon(sql as any);
+
+        // NO pasamos datasourceUrl ni datasources, ya que el constructor de Prisma 7
+        // con adaptador parece rechazarlos o ignorarlos. 
+        // El motor leerá DATABASE_URL del entorno.
+        const client = new PrismaClient({ adapter });
+
+        globalForPrisma.prismaInitError = null;
+        return client;
     } catch (e: any) {
         globalForPrisma.prismaInitError = e.message;
+        console.error('[PRISMA FATAL V22]', e.message);
         return null;
     }
 }
@@ -54,3 +60,4 @@ if (!globalForPrisma.prisma) {
 
 export const prisma = globalForPrisma.prisma;
 export const getInitError = () => globalForPrisma.prismaInitError;
+export const getMaskedUrl = () => globalForPrisma.maskedUrl;
