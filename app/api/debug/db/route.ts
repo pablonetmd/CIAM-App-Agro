@@ -6,45 +6,48 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
     const diagnostic = {
-        label: "CIAM-DIAGNOSTIC-V10-ENV-INJECTION",
+        label: "CIAM-DIAGNOSTIC-V11-MANUAL-PARAMS",
         status: "TESTING",
         initError: getInitError(),
-        urlInfo: {
-            sanitized: !!getSanitizedUrlExport(),
-            envMatches: process.env.DATABASE_URL === getSanitizedUrlExport()
+        environment: {
+            URL_MATCH: process.env.DATABASE_URL === getSanitizedUrlExport()
         },
         directDriver: "PENDING",
         prismaStatus: "PENDING"
     }
 
-    // Test 1: Driver Directo
+    // Test Driver
     try {
         const url = getSanitizedUrlExport();
         if (url) {
-            const pool = new Pool({ connectionString: url })
-            const client = await pool.connect()
-            await client.query('SELECT 1')
-            client.release()
+            const dbUrl = new URL(url);
+            const pool = new Pool({
+                host: dbUrl.hostname,
+                user: dbUrl.username,
+                password: decodeURIComponent(dbUrl.password),
+                database: dbUrl.pathname.slice(1),
+                ssl: true
+            });
+            const client = await pool.connect();
+            await client.query('SELECT 1');
+            client.release();
             diagnostic.directDriver = "OK";
-        } else {
-            diagnostic.directDriver = "SKIP: NO URL";
         }
     } catch (e: any) {
         diagnostic.directDriver = "ERROR: " + e.message;
     }
 
-    // Test 2: Prisma
+    // Test Prisma
     try {
         if (!prisma) {
-            diagnostic.prismaStatus = "NULL_OR_UNDEFINED";
+            diagnostic.prismaStatus = "OFFLINE";
         } else {
             const count = await (prisma as any).professional.count()
-            diagnostic.prismaStatus = "OK (" + count + ")";
+            diagnostic.prismaStatus = "ONLINE (" + count + ")";
             diagnostic.status = "SUCCESS";
         }
     } catch (e: any) {
-        diagnostic.prismaStatus = "RUNTIME_ERROR: " + e.message;
-        diagnostic.status = "RUNTIME_FAILED";
+        diagnostic.prismaStatus = "FAIL: " + e.message;
     }
 
     return NextResponse.json(diagnostic)

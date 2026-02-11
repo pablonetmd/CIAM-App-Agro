@@ -16,37 +16,41 @@ const getSanitizedUrl = () => {
         process.env.DATABASE_PRISMA_URL;
 
     if (!url || url === 'undefined' || url.trim() === '') return null;
-
-    // Limpieza de artefactos de copy-paste
     if (url.includes("'")) url = url.split("'")[1] || url;
     if (url.startsWith("psql ")) url = url.replace("psql ", "");
-
     return url.trim();
 }
 
 const createClient = () => {
     const url = getSanitizedUrl();
     if (!url) {
-        globalForPrisma.prismaInitError = "URL no encontrada en el entorno.";
+        globalForPrisma.prismaInitError = "URL no encontrada.";
         return null;
     }
 
     try {
-        // CRÍTICO: Sobrescribimos la variable de entorno para que el motor
-        // interno de Prisma (Rust/Wasm) también vea la URL limpia.
+        // Para que el motor interno de Prisma no se queje
         process.env.DATABASE_URL = url;
 
-        const pool = new Pool({ connectionString: url })
-        const adapter = new PrismaNeon(pool as any)
+        // PARSEO MANUAL: Si el connectionString falla, pasamos los parámetros por separado.
+        // Esto es mucho más robusto.
+        const dbUrl = new URL(url);
+        const poolConfig = {
+            host: dbUrl.hostname,
+            user: dbUrl.username,
+            password: decodeURIComponent(dbUrl.password),
+            database: dbUrl.pathname.slice(1),
+            port: parseInt(dbUrl.port) || 5432,
+            ssl: true,
+            max: 1 // Muy importante en Serverless para no agotar conexiones
+        };
 
-        // En Prisma 7, si usamos adaptador, la URL del motor se sincroniza
-        // con la que pusimos en process.env.DATABASE_URL.
-        const client = new PrismaClient({ adapter });
+        const pool = new Pool(poolConfig);
+        const adapter = new PrismaNeon(pool as any);
 
-        globalForPrisma.prismaInitError = null;
-        return client;
+        // En Prisma 7, pasamos el adaptador.
+        return new PrismaClient({ adapter });
     } catch (e: any) {
-        console.error('[PRISMA FATAL]', e.message);
         globalForPrisma.prismaInitError = e.message;
         return null;
     }
