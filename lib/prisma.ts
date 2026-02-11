@@ -16,14 +16,9 @@ const getDatabaseUrl = () => {
 
     if (!url || url === 'undefined' || url.trim() === '') return null;
 
-    // Limpieza de errores comunes de copy-paste
-    // Si la URL empieza con "psql '", la limpiamos
-    if (url.includes("'")) {
-        url = url.split("'")[1] || url;
-    }
-    if (url.startsWith("psql ")) {
-        url = url.replace("psql ", "");
-    }
+    // Limpieza de seguridad
+    if (url.includes("'")) url = url.split("'")[1] || url;
+    if (url.startsWith("psql ")) url = url.replace("psql ", "");
 
     return url.trim();
 }
@@ -31,34 +26,27 @@ const getDatabaseUrl = () => {
 const createClient = () => {
     const url = getDatabaseUrl();
 
-    // Log de diagnóstico (visible en logs de Vercel)
-    console.log(`[PRISMA INIT] Intentando conectar. URL presente: ${!!url}`);
-
-    if (!url || url === 'undefined' || url.trim() === '') {
-        console.error('[PRISMA ERROR] DATABASE_URL no está definida.');
-        return null;
-    }
+    if (!url) return null;
 
     try {
-        // Neon Serverless requiere que la URL tenga parámetros de SSL si no es local,
-        // pero el Pool de pg a veces necesita ayuda extra
-        const pool = new Pool({
-            connectionString: url,
-            ssl: true // Forzamos SSL para Neon
-        })
-
+        // 1. Configuramos el Pool para el Adaptador Neon
+        const pool = new Pool({ connectionString: url })
         const adapter = new PrismaNeon(pool as any)
-        const client = new PrismaClient({ adapter })
 
-        console.log('[PRISMA SUCCESS] Cliente creado exitosamente.');
-        return client;
+        // 2. Creamos el cliente pasando el adaptador Y la URL explícitamente.
+        // En Vercel, a veces el motor interno de Prisma no "ve" las env vars de Node,
+        // pasarla aquí fuerza la configuración.
+        return new PrismaClient({
+            adapter,
+            // @ts-ignore - Prisma 7 maneja esto internamente pero a veces el tipo se queja
+            datasourceUrl: url
+        })
     } catch (e: any) {
-        console.error('[PRISMA FATAL] Error al instanciar el cliente:', e.message);
+        console.error('[PRISMA FATAL]', e.message);
         return null;
     }
 }
 
-// Singleton: O devolvemos el existente, o creamos uno nuevo, o devolvemos null explícito
 export const prisma = globalForPrisma.prisma || createClient() || (null as unknown as PrismaClient);
 
 if (process.env.NODE_ENV !== 'production' && prisma) {
