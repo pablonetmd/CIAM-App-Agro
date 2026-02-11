@@ -87,11 +87,11 @@ export default function ValidatePage() {
                                     placeholder="XXXXXXXX"
                                     value={codigo}
                                     onChange={(e) => setCodigo(e.target.value.toUpperCase())}
-                                    maxLength={8}
+                                    maxLength={6}
                                     required
                                 />
                                 <p className="text-xs text-gray-500 mt-2 text-center">
-                                    Ingrese el código de 8 caracteres de la receta
+                                    Ingrese el código de 6 caracteres de la receta
                                 </p>
                             </div>
 
@@ -108,7 +108,7 @@ export default function ValidatePage() {
                                 <button
                                     type="submit"
                                     className="btn btn-primary flex-1"
-                                    disabled={loading || codigo.length !== 8}
+                                    disabled={loading || codigo.length !== 6}
                                 >
                                     {loading ? 'Validando...' : 'Validar Receta'}
                                 </button>
@@ -172,7 +172,7 @@ export default function ValidatePage() {
                                     <span className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-bold text-xs">
                                         2
                                     </span>
-                                    <span>Ingrese el código de 8 caracteres en el campo superior</span>
+                                    <span>Ingrese el código de 6 caracteres en el campo superior</span>
                                 </li>
                                 <li className="flex gap-3">
                                     <span className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-bold text-xs">
