@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 import { Pool } from '@neondatabase/serverless'
-import { prisma } from '@/lib/prisma'
+import { prisma, getInitError } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
     const diagnostic = {
-        label: "CIAM-DIAGNOSTIC-V8-DOUBLE-LINK",
+        label: "CIAM-DIAGNOSTIC-V9-ERROR-CAPTURE",
         status: "TESTING",
+        initError: getInitError(),
         environment: {
             DATABASE_URL_READY: !!process.env.DATABASE_URL,
             PHASE: process.env.NEXT_PHASE || 'runtime'
@@ -31,14 +32,16 @@ export async function GET() {
     // Test 2: Prisma
     try {
         if (!prisma) {
-            diagnostic.prismaStatus = "NOT_INSTANTIATED";
+            diagnostic.prismaStatus = "NULL_OR_UNDEFINED";
         } else {
+            // Intentamos una mini consulta para forzar la conexión
             const count = await (prisma as any).professional.count()
             diagnostic.prismaStatus = "OK (" + count + ")";
             diagnostic.status = "SUCCESS";
         }
     } catch (e: any) {
-        diagnostic.prismaStatus = "ERROR: " + e.message;
+        diagnostic.prismaStatus = "RUNTIME_ERROR: " + e.message;
+        diagnostic.status = "RUNTIME_FAILED";
     }
 
     return NextResponse.json(diagnostic)
