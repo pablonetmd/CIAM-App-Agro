@@ -7,6 +7,7 @@ const getSanitizedUrl = () => {
         process.env.DATABASE_PRISMA_URL;
 
     if (!url || url === 'undefined' || url.trim() === '') return "postgresql://ghost:ghost@localhost:5432/ghost";
+
     url = url.trim();
     if (url.includes("'")) url = url.split("'")[1] || url;
     if (url.startsWith("psql ")) url = url.replace("psql ", "");
