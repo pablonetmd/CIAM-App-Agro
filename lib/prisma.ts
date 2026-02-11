@@ -13,11 +13,8 @@ const getSanitizedUrl = () => {
         process.env.DATABASE_PRISMA_URL;
 
     if (!url || url === 'undefined' || url.trim() === '') return null;
-
-    // Limpieza de seguridad
     if (url.includes("'")) url = url.split("'")[1] || url;
     if (url.startsWith("psql ")) url = url.replace("psql ", "");
-
     return url.trim();
 }
 
@@ -29,24 +26,31 @@ const createClient = () => {
     }
 
     try {
-        // ACTUALIZACIÓN V12: Usamos el driver HTTP de Neon. 
-        // Es mucho más estable en Vercel que el Pool de WebSockets/Pg.
-        const sql = neon(url);
-
-        // El adaptador de Prisma acepta el cliente HTTP directamente.
-        const adapter = new PrismaNeon(sql as any);
-
-        // Sincronizamos la variable por si acaso el motor interno la busca
+        // 1. Preparamos el entorno para el motor interno
         process.env.DATABASE_URL = url;
 
-        return new PrismaClient({ adapter });
+        // 2. Preparamos el adaptador HTTP (V12 exitosa)
+        const sql = neon(url);
+        const adapter = new PrismaNeon(sql as any);
+
+        // 3. Instanciamos con Triple Escudo (Adaptador + Datasources Explícitos)
+        // Esto soluciona los errores de "No host" en Vercel.
+        return new PrismaClient({
+            adapter,
+            // @ts-ignore - Prisma 7 es estricto en tipos pero acepta este override
+            datasources: {
+                db: {
+                    url: url
+                }
+            }
+        });
     } catch (e: any) {
-        console.error('[PRISMA FATAL]', e.message);
         globalForPrisma.prismaInitError = e.message;
         return null;
     }
 }
 
+// Inicialización global (Singleton)
 if (!globalForPrisma.prisma) {
     globalForPrisma.prisma = createClient() || (undefined as any);
 }
