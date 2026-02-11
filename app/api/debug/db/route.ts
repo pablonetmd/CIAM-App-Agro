@@ -5,13 +5,9 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
     const diagnostic = {
-        label: "CIAM-DIAGNOSTIC-V15-ATOMIC",
+        label: "CIAM-DIAGNOSTIC-V16-LIBRARY-ENGINE",
         status: "TESTING",
         initError: getInitError(),
-        env: {
-            DATABASE_URL: !!process.env.DATABASE_URL,
-            POSTGRES_PRISMA_URL: !!process.env.POSTGRES_PRISMA_URL
-        },
         prisma: "PENDING"
     }
 
@@ -19,7 +15,6 @@ export async function GET() {
         if (!prisma) {
             diagnostic.prisma = "CLIENT_NULL";
         } else {
-            // Test real
             const count = await (prisma as any).professional.count()
             diagnostic.prisma = "READY (" + count + ")";
             diagnostic.status = "SUCCESS";

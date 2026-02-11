@@ -1,10 +1,6 @@
-import { neonConfig, Pool } from '@neondatabase/serverless'
+import { neon } from '@neondatabase/serverless'
 import { PrismaNeon } from '@prisma/adapter-neon'
 import { PrismaClient } from '@prisma/client'
-import ws from 'ws'
-
-// Configuración de WebSocket para entornos Serverless
-neonConfig.webSocketConstructor = ws
 
 const globalForPrisma = globalThis as unknown as {
     prisma: PrismaClient | undefined
@@ -17,41 +13,32 @@ const getSanitizedUrl = () => {
         process.env.DATABASE_PRISMA_URL;
 
     if (!url || url === 'undefined' || url.trim() === '') return null;
-
-    // Limpieza agresiva de URL
     if (url.includes("'")) url = url.split("'")[1] || url;
     if (url.startsWith("psql ")) url = url.replace("psql ", "");
-
     return url.trim();
 }
 
 const createClient = () => {
     const url = getSanitizedUrl();
     if (!url) {
-        globalForPrisma.prismaInitError = "URL no encontrada en ninguna variable de entorno.";
+        globalForPrisma.prismaInitError = "URL no encontrada.";
         return null;
     }
 
     try {
-        // V15: Redundancia de entorno. 
-        // Forzamos la URL en todas las variables que Prisma suele mirar.
+        // V16: El "Motor Invisble". 
+        // Usamos el adaptador HTTP (que ya vimos que funciona OK).
+        const sql = neon(url);
+        const adapter = new PrismaNeon(sql as any);
+
+        // Sincronizamos por si acaso.
         process.env.DATABASE_URL = url;
-        process.env.POSTGRES_URL = url;
-        process.env.DATABASE_PRISMA_URL = url;
-        process.env.POSTGRES_PRISMA_URL = url;
 
-        // Versión Pool (WebSockets). A veces es más compatible con Prisma 7 que HTTP Directo.
-        const pool = new Pool({ connectionString: url });
-        const adapter = new PrismaNeon(pool as any);
-
-        // Constructor estándar de Prisma 7 con adaptador.
-        const client = new PrismaClient({ adapter });
-
-        globalForPrisma.prismaInitError = null;
-        return client;
+        // Si el motor sigue quejándose de "No host", le damos un host ficticio
+        // pero válido para que se calle, ya que el ADAPTADOR es quien manda.
+        return new PrismaClient({ adapter });
     } catch (e: any) {
         globalForPrisma.prismaInitError = e.message;
-        console.error('[PRISMA FATAL V15]', e.message);
         return null;
     }
 }
