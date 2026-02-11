@@ -5,44 +5,44 @@ import { prisma } from '@/lib/prisma'
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
-    const url = process.env.DATABASE_URL;
+    const url = process.env.DATABASE_URL || process.env.POSTGRES_URL || 'MISSING';
 
     const diagnostic = {
+        version: "v-nuclear-diag-20260211", // Marcador para saber si Vercel se actualizó
         timestamp: new Date().toISOString(),
         env: {
-            NEXT_PHASE: process.env.NEXT_PHASE || 'runtime',
+            DATABASE_URL_PRESENT: !!process.env.DATABASE_URL,
+            DATABASE_URL_LENGTH: process.env.DATABASE_URL?.length || 0,
+            POSTGRES_URL_PRESENT: !!process.env.POSTGRES_URL,
             NODE_ENV: process.env.NODE_ENV,
-            DATABASE_URL: url ? `Present (Length: ${url.length}, Start: ${url.substring(0, 15)}...)` : 'MISSING',
-            // Buscar posibles duplicados o variantes
-            ALL_DATABASE_KEYS: Object.keys(process.env).filter(key => key.includes('DATABASE') || key.includes('URL') || key.includes('POSTGRES'))
         },
-        directPoolTest: {} as any,
-        prismaTest: {} as any
+        connectionTest: {} as any
     }
 
-    // Probar conexión directa con Pool (sin Prisma)
-    if (url) {
-        try {
-            const pool = new Pool({ connectionString: url })
-            const client = await pool.connect()
-            const result = await client.query('SELECT NOW()')
-            client.release()
-            diagnostic.directPoolTest = {
-                status: 'ok',
-                time: result.rows[0].now
-            }
-        } catch (e: any) {
-            diagnostic.directPoolTest = {
-                status: 'error',
-                message: e.message,
-                stack: e.stack?.split('\n')[0]
-            }
+    try {
+        if (url === 'MISSING') {
+            throw new Error("No database URL found in any environment variable");
+        }
+
+        const pool = new Pool({ connectionString: url })
+        const client = await pool.connect()
+        const result = await client.query('SELECT NOW() as now')
+        client.release()
+
+        diagnostic.connectionTest = {
+            status: 'ok',
+            time: result.rows[0].now
+        }
+    } catch (e: any) {
+        diagnostic.connectionTest = {
+            status: 'error',
+            message: e.message,
+            code: e.code
         }
     }
 
-    // Probar Prisma
     try {
-        const count = await prisma.professional.count()
+        const count = await (prisma as any).professional.count()
         diagnostic.prismaTest = {
             status: 'ok',
             count

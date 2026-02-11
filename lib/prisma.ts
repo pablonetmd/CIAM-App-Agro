@@ -10,55 +10,40 @@ const globalForPrisma = globalThis as unknown as {
 }
 
 const getDatabaseUrl = () => {
-    return process.env.DATABASE_URL ||
+    const url = process.env.DATABASE_URL ||
         process.env.POSTGRES_URL ||
         process.env.POSTGRES_PRISMA_URL ||
         process.env.DATABASE_PRISMA_URL;
+
+    if (!url || url === 'undefined' || url.trim() === '') return null;
+    return url;
 }
 
-const createClient = () => {
+const createPrismaClient = () => {
     const url = getDatabaseUrl();
 
-    // Log diagnóstico para Vercel
-    console.log('[PRISMA DEBUG] Probando DATABASE_URL...');
     if (!url) {
-        console.error('[PRISMA DEBUG] DATABASE_URL no encontrada en process.env');
-        return null;
-    }
-
-    console.log(`[PRISMA DEBUG] URL encontrada. Longitud: ${url.length}. Preview: ${url.substring(0, 10)}...`);
-
-    if (url.trim() === '' || url === 'undefined') {
-        console.error('[PRISMA DEBUG] URL es un string vacío o literal "undefined"');
+        console.error('[PRISMA] No database connection string found.');
         return null;
     }
 
     try {
+        console.log(`[PRISMA] Creating client with URL length: ${url.length}`);
         const pool = new Pool({ connectionString: url })
         const adapter = new PrismaNeon(pool as any)
-        const client = new PrismaClient({ adapter })
-        return client;
-    } catch (e: any) {
-        console.error('[PRISMA DEBUG] Error al crear cliente:', e.message);
+        return new PrismaClient({ adapter })
+    } catch (error: any) {
+        console.error('[PRISMA] Error creating client:', error.message);
         return null;
     }
 }
 
-// Singleton más simple y directo
-export const prisma = globalForPrisma.prisma || createClient() || ({} as PrismaClient);
+// Singleton robusto y sencillo
+export const prisma = globalForPrisma.prisma ?? createPrismaClient() ?? ({} as PrismaClient);
 
-// Agregamos una propiedad de ayuda para chequear estado
-(prisma as any).$isReady = !!globalForPrisma.prisma || (!!getDatabaseUrl() && getDatabaseUrl() !== 'undefined');
+// Marcador de estado
+(prisma as any).$isReady = !!(prisma as any).professional;
 
-if (process.env.NODE_ENV !== 'production') {
-    if (!globalForPrisma.prisma && (prisma as any).$isReady) {
-        globalForPrisma.prisma = prisma;
-    }
-}
-
-// Si estamos en producción, queremos forzar la reinicialización si no está listo
-if (process.env.NODE_ENV === 'production') {
-    if (!globalForPrisma.prisma && (prisma as any).$isReady) {
-        globalForPrisma.prisma = prisma;
-    }
+if (process.env.NODE_ENV !== 'production' && (prisma as any).$isReady) {
+    globalForPrisma.prisma = prisma
 }
