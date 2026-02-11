@@ -6,50 +6,59 @@ import ws from 'ws'
 neonConfig.webSocketConstructor = ws
 
 const globalForPrisma = globalThis as unknown as {
-    prisma: PrismaClient | null
+    prisma: PrismaClient | undefined
 }
 
-const createPrismaClient = (): PrismaClient | null => {
-    const url = process.env.DATABASE_URL;
-    if (!url || url.trim() === '' || url === 'undefined') return null;
+const getDatabaseUrl = () => {
+    return process.env.DATABASE_URL ||
+        process.env.POSTGRES_URL ||
+        process.env.POSTGRES_PRISMA_URL ||
+        process.env.DATABASE_PRISMA_URL;
+}
+
+const createClient = () => {
+    const url = getDatabaseUrl();
+
+    // Log diagnóstico para Vercel
+    console.log('[PRISMA DEBUG] Probando DATABASE_URL...');
+    if (!url) {
+        console.error('[PRISMA DEBUG] DATABASE_URL no encontrada en process.env');
+        return null;
+    }
+
+    console.log(`[PRISMA DEBUG] URL encontrada. Longitud: ${url.length}. Preview: ${url.substring(0, 10)}...`);
+
+    if (url.trim() === '' || url === 'undefined') {
+        console.error('[PRISMA DEBUG] URL es un string vacío o literal "undefined"');
+        return null;
+    }
 
     try {
         const pool = new Pool({ connectionString: url })
         const adapter = new PrismaNeon(pool as any)
-        return new PrismaClient({ adapter })
-    } catch (e) {
+        const client = new PrismaClient({ adapter })
+        return client;
+    } catch (e: any) {
+        console.error('[PRISMA DEBUG] Error al crear cliente:', e.message);
         return null;
     }
 }
 
-// Proxy transparente que actúa como PrismaClient pero se inicializa bajo demanda
-export const prisma = new Proxy({} as PrismaClient & { $isReady: boolean }, {
-    get: (target, prop) => {
-        // Propiedad especial para chequear estado sin disparar errores
-        if (prop === '$isReady') {
-            if (globalForPrisma.prisma) return true;
-            const test = createPrismaClient();
-            if (test) {
-                globalForPrisma.prisma = test;
-                return true;
-            }
-            return false;
-        }
+// Singleton más simple y directo
+export const prisma = globalForPrisma.prisma || createClient() || ({} as PrismaClient);
 
-        if (globalForPrisma.prisma) {
-            const val = (globalForPrisma.prisma as any)[prop];
-            return typeof val === 'function' ? val.bind(globalForPrisma.prisma) : val;
-        }
+// Agregamos una propiedad de ayuda para chequear estado
+(prisma as any).$isReady = !!globalForPrisma.prisma || (!!getDatabaseUrl() && getDatabaseUrl() !== 'undefined');
 
-        const newClient = createPrismaClient();
-        if (!newClient) {
-            // Mock para build
-            if (process.env.NEXT_PHASE === 'phase-production-build') return (target as any)[prop];
-            throw new Error('DATABASE_INITIALIZATION_FAILED');
-        }
-
-        globalForPrisma.prisma = newClient;
-        const val = (newClient as any)[prop];
-        return typeof val === 'function' ? val.bind(newClient) : val;
+if (process.env.NODE_ENV !== 'production') {
+    if (!globalForPrisma.prisma && (prisma as any).$isReady) {
+        globalForPrisma.prisma = prisma;
     }
-})
+}
+
+// Si estamos en producción, queremos forzar la reinicialización si no está listo
+if (process.env.NODE_ENV === 'production') {
+    if (!globalForPrisma.prisma && (prisma as any).$isReady) {
+        globalForPrisma.prisma = prisma;
+    }
+}

@@ -1,33 +1,56 @@
 import { NextResponse } from 'next/server'
+import { Pool } from '@neondatabase/serverless'
 import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
+    const url = process.env.DATABASE_URL;
+
     const diagnostic = {
         timestamp: new Date().toISOString(),
         env: {
-            NEXT_PHASE: process.env.NEXT_PHASE || 'not_set',
+            NEXT_PHASE: process.env.NEXT_PHASE || 'runtime',
             NODE_ENV: process.env.NODE_ENV,
-            DB_URL_STATUS: !!process.env.DATABASE_URL ? 'PRESENT' : 'MISSING',
-            DB_URL_LENGTH: process.env.DATABASE_URL?.length || 0,
-            DB_URL_PROTOCOL: process.env.DATABASE_URL?.split(':')[0] || 'none',
+            DATABASE_URL: url ? `Present (Length: ${url.length}, Start: ${url.substring(0, 15)}...)` : 'MISSING',
+            // Buscar posibles duplicados o variantes
+            ALL_DATABASE_KEYS: Object.keys(process.env).filter(key => key.includes('DATABASE') || key.includes('URL') || key.includes('POSTGRES'))
         },
-        database: {} as any
+        directPoolTest: {} as any,
+        prismaTest: {} as any
     }
 
-    try {
-        // Intentamos una operación básica
-        const count = await prisma.professional.count()
-        diagnostic.database = {
-            status: 'ok',
-            professionalCount: count
+    // Probar conexión directa con Pool (sin Prisma)
+    if (url) {
+        try {
+            const pool = new Pool({ connectionString: url })
+            const client = await pool.connect()
+            const result = await client.query('SELECT NOW()')
+            client.release()
+            diagnostic.directPoolTest = {
+                status: 'ok',
+                time: result.rows[0].now
+            }
+        } catch (e: any) {
+            diagnostic.directPoolTest = {
+                status: 'error',
+                message: e.message,
+                stack: e.stack?.split('\n')[0]
+            }
         }
-    } catch (error: any) {
-        diagnostic.database = {
+    }
+
+    // Probar Prisma
+    try {
+        const count = await prisma.professional.count()
+        diagnostic.prismaTest = {
+            status: 'ok',
+            count
+        }
+    } catch (e: any) {
+        diagnostic.prismaTest = {
             status: 'error',
-            error: error.message,
-            stack_hint: error.stack?.split('\n')[0]
+            message: e.message
         }
     }
 
