@@ -4,50 +4,55 @@ import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
+const sanitize = (url: string | undefined): string | null => {
+    if (!url) return null;
+    let clean = url;
+    if (clean.includes("'")) clean = clean.split("'")[1] || clean;
+    if (clean.startsWith("psql ")) clean = clean.replace("psql ", "");
+    return clean.trim();
+}
+
 export async function GET() {
-    const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+    const rawUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+    const cleanUrl = sanitize(rawUrl);
 
     const diagnostic = {
-        label: "CIAM-DIAGNOSTIC-V6",
-        status: "INVESTIGATING",
-        environment: {
-            DATABASE_URL_EXISTS: !!process.env.DATABASE_URL,
-            DATABASE_URL_LENGTH: process.env.DATABASE_URL?.length || 0,
-            DATABASE_URL_PROTOCOL: process.env.DATABASE_URL?.split(':')[0] || 'none',
-            NODE_ENV: process.env.NODE_ENV,
+        label: "CIAM-DIAGNOSTIC-V7-CLEANER",
+        status: "TESTING_SANITIZER",
+        urlAnalysis: {
+            rawProtocol: rawUrl?.split(':')[0] || 'none',
+            isCleaned: rawUrl !== cleanUrl,
+            cleanProtocol: cleanUrl?.split(':')[0] || 'none',
+            cleanLength: cleanUrl?.length || 0
         },
         directDriverTest: {} as any,
         prismaTest: {} as any
     }
 
-    // 1. Probar el driver Neon directamente
-    if (url) {
+    if (cleanUrl) {
         try {
-            const pool = new Pool({ connectionString: url })
+            const pool = new Pool({ connectionString: cleanUrl, ssl: true })
             const client = await pool.connect()
             const res = await client.query('SELECT 1 as result')
             client.release()
             diagnostic.directDriverTest = { status: "OK", result: res.rows[0].result }
+            diagnostic.status = "DRIVER_CONNECTED";
         } catch (e: any) {
             diagnostic.directDriverTest = { status: "ERROR", message: e.message };
         }
-    } else {
-        diagnostic.directDriverTest = { status: "SKIP", message: "No URL found" };
     }
 
-    // 2. Probar Prisma
     try {
         if (!(prisma as any).professional) {
             diagnostic.prismaTest = { status: "NOT_INITIALIZED" };
         } else {
             const count = await (prisma as any).professional.count()
             diagnostic.prismaTest = { status: "OK", count };
-            diagnostic.status = "SUCCESS";
+            if (diagnostic.status === "DRIVER_CONNECTED") diagnostic.status = "FULLY_READY";
         }
     } catch (e: any) {
         diagnostic.prismaTest = { status: "ERROR", message: e.message };
     }
 
-    // Si ambos fallan con el mismo error, el problema es la URL de Vercel
     return NextResponse.json(diagnostic)
 }

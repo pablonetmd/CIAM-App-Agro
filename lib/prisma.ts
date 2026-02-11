@@ -9,11 +9,27 @@ const globalForPrisma = globalThis as unknown as {
     prisma: PrismaClient | undefined
 }
 
-const createClient = () => {
-    // Intentamos obtener la URL de varias fuentes comunes en Vercel
-    const url = process.env.DATABASE_URL ||
+const getDatabaseUrl = () => {
+    let url = process.env.DATABASE_URL ||
         process.env.POSTGRES_URL ||
         process.env.DATABASE_PRISMA_URL;
+
+    if (!url || url === 'undefined' || url.trim() === '') return null;
+
+    // Limpieza de errores comunes de copy-paste
+    // Si la URL empieza con "psql '", la limpiamos
+    if (url.includes("'")) {
+        url = url.split("'")[1] || url;
+    }
+    if (url.startsWith("psql ")) {
+        url = url.replace("psql ", "");
+    }
+
+    return url.trim();
+}
+
+const createClient = () => {
+    const url = getDatabaseUrl();
 
     // Log de diagnóstico (visible en logs de Vercel)
     console.log(`[PRISMA INIT] Intentando conectar. URL presente: ${!!url}`);
