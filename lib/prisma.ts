@@ -10,33 +10,41 @@ const globalForPrisma = globalThis as unknown as {
 }
 
 const createClient = () => {
+    // Intentamos obtener la URL de varias fuentes comunes en Vercel
     const url = process.env.DATABASE_URL ||
         process.env.POSTGRES_URL ||
         process.env.DATABASE_PRISMA_URL;
 
-    console.log(`[PRISMA INIT] DATABASE_URL found: ${!!url}, Length: ${url?.length || 0}`);
+    // Log de diagnóstico (visible en logs de Vercel)
+    console.log(`[PRISMA INIT] Intentando conectar. URL presente: ${!!url}`);
 
     if (!url || url === 'undefined' || url.trim() === '') {
-        console.error('[PRISMA ERROR] DATABASE_URL is missing or empty at runtime');
+        console.error('[PRISMA ERROR] DATABASE_URL no está definida.');
         return null;
     }
 
     try {
-        const pool = new Pool({ connectionString: url })
+        // Neon Serverless requiere que la URL tenga parámetros de SSL si no es local,
+        // pero el Pool de pg a veces necesita ayuda extra
+        const pool = new Pool({
+            connectionString: url,
+            ssl: true // Forzamos SSL para Neon
+        })
+
         const adapter = new PrismaNeon(pool as any)
-        return new PrismaClient({ adapter })
+        const client = new PrismaClient({ adapter })
+
+        console.log('[PRISMA SUCCESS] Cliente creado exitosamente.');
+        return client;
     } catch (e: any) {
-        console.error('[PRISMA] Failed to create client:', e.message);
+        console.error('[PRISMA FATAL] Error al instanciar el cliente:', e.message);
         return null;
     }
 }
 
-// Singleton directo
-export const prisma = globalForPrisma.prisma || createClient() || ({} as PrismaClient);
+// Singleton: O devolvemos el existente, o creamos uno nuevo, o devolvemos null explícito
+export const prisma = globalForPrisma.prisma || createClient() || (null as unknown as PrismaClient);
 
-// Propiedad de estado interna
-(prisma as any).$isReady = !!(prisma as any).professional;
-
-if (process.env.NODE_ENV !== 'production' && (prisma as any).$isReady) {
+if (process.env.NODE_ENV !== 'production' && prisma) {
     globalForPrisma.prisma = prisma;
 }
