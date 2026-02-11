@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  // eslint ya no se configura aquí en versiones recientes de Next.js
+  serverExternalPackages: ["@prisma/client"]
 };
 
 export default nextConfig;

@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
     const diagnostic = {
-        label: "CIAM-DIAGNOSTIC-V17-EDGE-WASM",
+        label: "CIAM-DIAGNOSTIC-V19-EXTERNAL-PKG",
         status: "TESTING",
         initError: getInitError(),
         environment: {
@@ -17,9 +17,8 @@ export async function GET() {
 
     try {
         if (!prisma) {
-            diagnostic.prisma = "CLIENT_NULL";
+            diagnostic.prisma = "OFFLINE_NULL";
         } else {
-            // Intentamos una consulta real
             const count = await (prisma as any).professional.count()
             diagnostic.prisma = "READY (" + count + ")";
             diagnostic.status = "SUCCESS";
