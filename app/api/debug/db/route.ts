@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
     const diagnostic = {
-        label: "CIAM-DIAGNOSTIC-V24-NEON-PULSE",
+        label: "CIAM-DIAGNOSTIC-V26-WASM-CORE",
         status: "TESTING",
         initError: getInitError(),
         urlInfo: getMaskedUrl(),
@@ -16,13 +16,12 @@ export async function GET() {
 
     const url = process.env.DATABASE_URL;
 
-    // --- TEST 1: Driver Directo (Neon HTTP con sintaxis correcta) ---
+    // --- TEST 1: Driver Directo (Neon HTTP) ---
     try {
         if (!url) {
             diagnostic.driverStatus = "FAIL: No URL";
         } else {
             const sql = neon(url);
-            // Sintaxis de tagged template obligatoria en versiones modernas de neon
             await sql`SELECT 1`;
             diagnostic.driverStatus = "SUCCESS (Neon HTTP Connected)";
         }

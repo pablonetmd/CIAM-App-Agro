@@ -21,7 +21,8 @@ const getSanitizedUrl = () => {
     const cleanUrl = url.trim();
     globalForPrisma.maskedUrl = cleanUrl.substring(0, 10) + "..." + cleanUrl.substring(cleanUrl.length - 5);
 
-    // Inyectamos GLOBALMENTE para el motor de Prisma
+    // Inyectamos GLOBALMENTE para el motor de Prisma.
+    // Aunque usemos Wasm, a veces el motor sigue buscando esta variable.
     process.env.DATABASE_URL = cleanUrl;
     return cleanUrl;
 }
@@ -29,20 +30,21 @@ const getSanitizedUrl = () => {
 const createClient = () => {
     const url = getSanitizedUrl();
     if (!url) {
-        globalForPrisma.prismaInitError = "DATABASE_URL no encontrada en el sistema.";
+        globalForPrisma.prismaInitError = "URL no encontrada en el sistema.";
         return null;
     }
 
     try {
-        // V24: Neon Pulse (Official HTTP Adapter)
+        // V26: Wasm Engine + Neon HTTP.
+        // Hemos forzado engineType = "wasm" en schema.prisma.
+        // El motor Wasm NO busca un host local, confía plenamente en el adaptador.
         const sql = neon(url);
         const adapter = new PrismaNeon(sql);
 
-        // Constructor minimalista oficial de Prisma 7
         return new PrismaClient({ adapter });
     } catch (e: any) {
         globalForPrisma.prismaInitError = e.message;
-        console.error('[PRISMA FATAL V24]', e.message);
+        console.error('[PRISMA FATAL V26]', e.message);
         return null;
     }
 }
