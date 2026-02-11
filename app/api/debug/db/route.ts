@@ -5,27 +5,28 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
     const diagnostic = {
-        label: "CIAM-DIAGNOSTIC-V13-TRIPLE-SHIELD",
+        label: "CIAM-FINAL-V14-STABLE",
         status: "TESTING",
         initError: getInitError(),
         environment: {
-            DATABASE_URL: !!process.env.DATABASE_URL,
+            HAS_URL: !!process.env.DATABASE_URL,
             NODE_ENV: process.env.NODE_ENV
         },
-        prismaStatus: "PENDING"
+        prisma: "PENDING"
     }
 
     try {
         if (!prisma) {
-            diagnostic.prismaStatus = "OFFLINE_NULL";
+            diagnostic.prisma = "CLIENT_NULL";
         } else {
-            // Consulta de humo
+            // Smoke query
             const count = await (prisma as any).professional.count()
-            diagnostic.prismaStatus = "ONLINE (" + count + ")";
+            diagnostic.prisma = "READY (" + count + ")";
             diagnostic.status = "SUCCESS";
         }
     } catch (e: any) {
-        diagnostic.prismaStatus = "FAIL: " + e.message;
+        diagnostic.prisma = "ERROR: " + e.message;
+        diagnostic.status = "FAILED";
     }
 
     return NextResponse.json(diagnostic)
