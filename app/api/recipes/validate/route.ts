@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        if (!prisma.$isReady) {
+        if (!(prisma as any).professional) {
             console.error('[API ERROR] Prisma client failed to initialize');
             return NextResponse.json(
                 { error: 'Base de datos no disponible temporalmente (Prisma Init Failed)' },

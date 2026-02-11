@@ -14,8 +14,10 @@ const createClient = () => {
         process.env.POSTGRES_URL ||
         process.env.DATABASE_PRISMA_URL;
 
+    console.log(`[PRISMA INIT] DATABASE_URL found: ${!!url}, Length: ${url?.length || 0}`);
+
     if (!url || url === 'undefined' || url.trim() === '') {
-        console.error('[PRISMA] No URL found in environment variables');
+        console.error('[PRISMA ERROR] DATABASE_URL is missing or empty at runtime');
         return null;
     }
 

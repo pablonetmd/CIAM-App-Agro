@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Matrícula requerida' }, { status: 400 })
         }
 
-        if (!prisma.$isReady) {
+        if (!(prisma as any).professional) {
             console.error('[API ERROR] Prisma client failed to initialize');
             return NextResponse.json(
                 { error: 'Base de datos no disponible temporalmente (Prisma Init Failed)' },
