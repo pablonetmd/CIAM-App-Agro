@@ -10,34 +10,38 @@ const globalForPrisma = globalThis as unknown as {
     prismaInitError: string | null
 }
 
-const getDatabaseUrl = () => {
+const getSanitizedUrl = () => {
     let url = process.env.DATABASE_URL ||
         process.env.POSTGRES_URL ||
         process.env.DATABASE_PRISMA_URL;
 
     if (!url || url === 'undefined' || url.trim() === '') return null;
+
+    // Limpieza de artefactos de copy-paste
     if (url.includes("'")) url = url.split("'")[1] || url;
     if (url.startsWith("psql ")) url = url.replace("psql ", "");
+
     return url.trim();
 }
 
 const createClient = () => {
-    const url = getDatabaseUrl();
+    const url = getSanitizedUrl();
     if (!url) {
-        globalForPrisma.prismaInitError = "No URL found in environment";
+        globalForPrisma.prismaInitError = "URL no encontrada en el entorno.";
         return null;
     }
 
     try {
+        // CRÍTICO: Sobrescribimos la variable de entorno para que el motor
+        // interno de Prisma (Rust/Wasm) también vea la URL limpia.
+        process.env.DATABASE_URL = url;
+
         const pool = new Pool({ connectionString: url })
         const adapter = new PrismaNeon(pool as any)
 
-        // Intentamos instanciar. Si falla, capturamos el por qué.
-        const client = new PrismaClient({
-            adapter,
-            // @ts-ignore
-            datasourceUrl: url
-        });
+        // En Prisma 7, si usamos adaptador, la URL del motor se sincroniza
+        // con la que pusimos en process.env.DATABASE_URL.
+        const client = new PrismaClient({ adapter });
 
         globalForPrisma.prismaInitError = null;
         return client;
@@ -48,10 +52,10 @@ const createClient = () => {
     }
 }
 
-// Inicialización
 if (!globalForPrisma.prisma) {
     globalForPrisma.prisma = createClient() || (undefined as any);
 }
 
 export const prisma = globalForPrisma.prisma;
 export const getInitError = () => globalForPrisma.prismaInitError;
+export const getSanitizedUrlExport = getSanitizedUrl;
